@@ -47,14 +47,37 @@ def login():
             attempts[ip].append(now)
             attempts[ip] = [t for t in attempts[ip] if now - t < timedelta(seconds=60)]
 
-            if len(attempts[ip]) > MAX_ATTEMPTS:
-                blocked_ips[ip] = now + timedelta(seconds=BLOCK_TIME)
-                message = "🚫 BLOCKED!"
-            else:
-                message = f"❌ Failed Attempt {len(attempts[ip])}"
+            count = len(attempts[ip])
 
-        # Attack type
-        attack_type = "Brute Force" if len(attempts.get(ip, [])) > 3 else "Normal"
+            # 🔥 Threat Detection + Response Engine
+            if count <= 3:
+                threat = "LOW"
+                action = "LOGGED"
+
+            elif count <= 5:
+                threat = "MEDIUM"
+                action = "WARNING"
+
+            elif count <= 8:
+                threat = "HIGH"
+                blocked_ips[ip] = now + timedelta(seconds=BLOCK_TIME)
+                action = "IP BLOCKED"
+
+            else:
+                threat = "CRITICAL"
+                blocked_ips[ip] = now + timedelta(seconds=300)
+                action = "PERMANENT BLOCK"
+
+            message = f"❌ Attempt {count} | {threat}"
+
+        # Attack Type
+        count = len(attempts.get(ip, []))
+        if count > 6:
+            attack_type = "Brute Force"
+        elif count > 3:
+            attack_type = "Password Spray"
+        else:
+            attack_type = "Normal"
 
         # Logs
         logs.append({
@@ -62,10 +85,12 @@ def login():
             "time": now.strftime("%H:%M:%S"),
             "status": status,
             "location": get_location(ip),
-            "type": attack_type
+            "type": attack_type,
+            "threat": threat if status == "FAILED" else "NONE",
+            "action": action if status == "FAILED" else "LOGIN SUCCESS"
         })
 
-        # Timeline for graph
+        # Timeline (for graph)
         timeline.append({
             "time": now.strftime("%H:%M:%S"),
             "count": len(attempts.get(ip, []))
