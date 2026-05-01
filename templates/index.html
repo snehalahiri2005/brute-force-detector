@@ -1,88 +1,132 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>SOC Dashboard</title>
+<title>SOC Platform</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body { background:#020617; color:white; font-family:Arial; }
-.tabs { display:flex; gap:20px; padding:10px; cursor:pointer; }
+body {
+    margin:0;
+    font-family: 'Segoe UI';
+    background: linear-gradient(135deg,#020617,#020617);
+    color:white;
+}
+
+/* SIDEBAR */
+.sidebar {
+    width:220px;
+    height:100vh;
+    position:fixed;
+    background:#020617;
+    border-right:1px solid #0ea5e9;
+    padding:20px;
+}
+
+.sidebar h2 { color:#0ea5e9; }
+
+.sidebar div {
+    margin:20px 0;
+    cursor:pointer;
+}
+
+.sidebar div:hover {
+    color:#0ea5e9;
+}
+
+/* MAIN */
+.main {
+    margin-left:240px;
+    padding:20px;
+}
+
+/* CARDS */
 .card {
-    background:#0f172a;
+    background:rgba(15,23,42,0.8);
+    backdrop-filter: blur(10px);
     padding:20px;
     border-radius:12px;
     margin:10px;
-    box-shadow:0 0 15px rgba(0,255,255,0.2);
+    box-shadow:0 0 20px rgba(0,255,255,0.2);
     transition:0.3s;
 }
+
 .card:hover { transform:scale(1.02); }
 
-.hidden { display:none; }
-
-.grid { display:grid; grid-template-columns: repeat(2,1fr); gap:20px; }
-
-.alert {
-    background:red;
-    padding:10px;
-    text-align:center;
-    display:none;
+.grid {
+    display:grid;
+    grid-template-columns: repeat(4,1fr);
+    gap:20px;
 }
-input, button {
+
+/* STATUS */
+.status {
+    padding:10px;
+    border-radius:10px;
+    text-align:center;
+    margin-bottom:10px;
+}
+
+.safe { background:green; }
+.danger { background:red; }
+
+/* LOGIN */
+input,button {
     padding:10px;
     margin:5px;
-    border-radius:6px;
+    border-radius:5px;
     border:none;
 }
 
 button {
-    background:#06b6d4;
+    background:#0ea5e9;
     color:white;
     cursor:pointer;
 }
+
+.hidden { display:none; }
+
 </style>
 </head>
 
 <body>
 
-<h1>🔐 SOC Platform</h1>
-<div id="alert" class="alert">⚠️ HIGH THREAT DETECTED</div>
-
-<div class="tabs">
-<span onclick="showTab('dash')">Dashboard</span>
-<span onclick="showTab('logs')">Logs</span>
-<span onclick="showTab('control')">Control</span>
+<!-- SIDEBAR -->
+<div class="sidebar">
+<h2>🔐 SOC</h2>
+<div onclick="showTab('dash')">Dashboard</div>
+<div onclick="showTab('logs')">Logs</div>
+<div onclick="showTab('control')">Control</div>
 </div>
 
-<!-- DASHBOARD -->
+<!-- MAIN -->
+<div class="main">
+
+<h1>Security Operations Center</h1>
+
+<div id="status" class="status safe">SYSTEM SECURE</div>
+
 <!-- DASHBOARD -->
 <div id="dash">
 
-<!-- 🔐 LOGIN SIMULATION -->
 <div class="card">
 <h3>🔐 Login Simulation</h3>
-
 <form method="POST">
-<input name="username" placeholder="Username" required>
-<input name="password" type="password" placeholder="Password" required>
-<button type="submit">Login</button>
+<input name="username" placeholder="Username">
+<input name="password" type="password" placeholder="Password">
+<button>Login</button>
 </form>
 
-<p>{{ message }}</p>
-
-<!-- 🔥 ATTACK SIMULATOR -->
 <button onclick="simulateAttack()">⚡ Simulate Attack</button>
-
+<p>{{ message }}</p>
 </div>
 
-<!-- KPI -->
 <div class="grid">
-<div class="card"><h3>Total Attacks</h3><p id="fail"></p></div>
-<div class="card"><h3>Success</h3><p id="success"></p></div>
-<div class="card"><h3>Blocked IPs</h3><p id="ipCount"></p></div>
-<div class="card"><h3>Blocked Users</h3><p id="userCount"></p></div>
+<div class="card"><h3>Attacks</h3><h1 id="fail">0</h1></div>
+<div class="card"><h3>Success</h3><h1 id="success">0</h1></div>
+<div class="card"><h3>Blocked IPs</h3><h1 id="ipCount">0</h1></div>
+<div class="card"><h3>Blocked Users</h3><h1 id="userCount">0</h1></div>
 </div>
 
-<!-- GRAPHS -->
 <div class="card">
 <h3>Attack Timeline</h3>
 <canvas id="lineChart"></canvas>
@@ -94,6 +138,7 @@ button {
 </div>
 
 </div>
+
 <!-- LOGS -->
 <div id="logs" class="hidden">
 <div class="card">
@@ -106,7 +151,6 @@ button {
 
 <!-- CONTROL -->
 <div id="control" class="hidden">
-
 <div class="card">
 <h3>Blocked IPs</h3>
 <ul id="ips"></ul>
@@ -117,21 +161,14 @@ button {
 <ul id="users"></ul>
 </div>
 
-<button onclick="window.location='/export_logs'">Download Logs</button>
+<button onclick="window.location='/export_logs'">Export Logs</button>
+</div>
 
 </div>
 
 <script>
-let lineChart, pieChart;
-function simulateAttack(){
-    for(let i=0;i<10;i++){
-        fetch("/",{
-            method:"POST",
-            headers:{'Content-Type':'application/x-www-form-urlencoded'},
-            body:"username=hacker&password=wrong"
-        });
-    }
-}
+let lineChart,pieChart;
+
 function showTab(id){
 document.querySelectorAll("#dash,#logs,#control").forEach(d=>d.classList.add("hidden"));
 document.getElementById(id).classList.remove("hidden");
@@ -142,30 +179,38 @@ const res = await fetch('/logs',{headers:{'x-api-key':'soc-secret-key'}});
 const data = await res.json();
 
 // KPI
-document.getElementById("fail").innerText = data.fail;
-document.getElementById("success").innerText = data.success;
-document.getElementById("ipCount").innerText = data.blocked_ips.length;
-document.getElementById("userCount").innerText = data.blocked_users.length;
+fail.innerText=data.fail;
+success.innerText=data.success;
+ipCount.innerText=data.blocked_ips.length;
+userCount.innerText=data.blocked_users.length;
+
+// STATUS
+if(data.fail > 10){
+status.innerText="⚠️ UNDER ATTACK";
+status.className="status danger";
+}else{
+status.innerText="SYSTEM SECURE";
+status.className="status safe";
+}
 
 // GRAPH
-const times = data.timeline.map(t=>t.time);
-const counts = data.timeline.map(t=>t.count);
+const times=data.timeline.map(t=>t.time);
+const counts=data.timeline.map(t=>t.count);
 
 if(lineChart) lineChart.destroy();
-lineChart = new Chart(document.getElementById("lineChart"),{
+lineChart=new Chart(lineChartEl=document.getElementById("lineChart"),{
 type:"line",
-data:{labels:times,datasets:[{label:"Attack Rate",data:counts,borderColor:"cyan"}]}
+data:{labels:times,datasets:[{label:"Attack Rate",data:counts,borderColor:"#0ea5e9"}]}
 });
 
 if(pieChart) pieChart.destroy();
-pieChart = new Chart(document.getElementById("pieChart"),{
+pieChart=new Chart(document.getElementById("pieChart"),{
 type:"pie",
 data:{labels:["Success","Fail"],datasets:[{data:[data.success,data.fail]}]}
 });
 
-// LOG TABLE
-document.getElementById("logTable").innerHTML =
-data.logs.map(l=>`
+// LOGS
+logTable.innerHTML=data.logs.map(l=>`
 <tr>
 <td>${l.ip}</td>
 <td>${l.user}</td>
@@ -174,30 +219,23 @@ data.logs.map(l=>`
 <td>${l.action}</td>
 </tr>`).join("");
 
-// BLOCKED LIST
-document.getElementById("ips").innerHTML =
-data.blocked_ips.map(ip=>`<li>${ip} <button onclick="unblockIP('${ip}')">Unblock</button></li>`).join("");
-
-document.getElementById("users").innerHTML =
-data.blocked_users.map(u=>`<li>${u} <button onclick="unblockUser('${u}')">Unblock</button></li>`).join("");
-
-// ALERT
-if(data.fail > 10){
-document.getElementById("alert").style.display="block";
-}else{
-document.getElementById("alert").style.display="none";
-}
+// BLOCKED
+ips.innerHTML=data.blocked_ips.map(ip=>`<li>${ip}</li>`).join("");
+users.innerHTML=data.blocked_users.map(u=>`<li>${u}</li>`).join("");
 }
 
-function unblockIP(ip){
-fetch('/unblock_ip/'+ip).then(load);
+function simulateAttack(){
+for(let i=0;i<10;i++){
+fetch("/",{
+method:"POST",
+headers:{'Content-Type':'application/x-www-form-urlencoded'},
+body:"username=hacker&password=wrong"
+});
 }
-
-function unblockUser(u){
-fetch('/unblock_user/'+u).then(load);
 }
 
 setInterval(load,2000);
 </script>
+
 </body>
 </html>
