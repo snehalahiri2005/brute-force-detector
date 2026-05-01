@@ -1,20 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Brute Force Simulator</title>
+    <title>Cyber Security Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #0f172a;
+            color: white;
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 20px;
+        }
+
+        .card {
+            background: #1e293b;
+            padding: 20px;
+            margin: 20px;
+            border-radius: 10px;
+        }
+
+        input, button {
+            padding: 10px;
+            margin: 5px;
+        }
+
+        button {
+            background: red;
+            color: white;
+            border: none;
+        }
+    </style>
 </head>
+
 <body>
-    <h2>🔐 Login System</h2>
 
+<h1>🔐 Cyber Security Dashboard</h1>
+
+<div class="card">
+    <h2>Login Simulator</h2>
     <form method="POST">
-        Username: <input type="text" name="username"><br><br>
-        Password: <input type="password" name="password"><br><br>
-        <button type="submit">Login</button>
+        <input name="username" placeholder="Username">
+        <input name="password" type="password" placeholder="Password">
+        <button>Login</button>
     </form>
-
     <p>{{ message }}</p>
+</div>
 
-    <br>
-    <a href="/logs">View Logs</a>
+<div class="card">
+    <h2>📊 Attack Attempts</h2>
+    <canvas id="chart"></canvas>
+</div>
+
+<div class="card">
+    <h2>🚫 Blocked IPs</h2>
+    <ul id="blocked"></ul>
+</div>
+
+<script>
+async function loadData() {
+    const res = await fetch('/logs');
+    const data = await res.json();
+
+    const labels = Object.keys(data.attempts);
+    const values = Object.values(data.attempts);
+
+    new Chart(document.getElementById('chart'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Attempts',
+                data: values
+            }]
+        }
+    });
+
+    let blockedList = document.getElementById("blocked");
+    blockedList.innerHTML = "";
+    data.blocked.forEach(ip => {
+        let li = document.createElement("li");
+        li.innerText = ip;
+        blockedList.appendChild(li);
+    });
+}
+
+loadData();
+setInterval(loadData, 3000);
+</script>
+
 </body>
 </html>
