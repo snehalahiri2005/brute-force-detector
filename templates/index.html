@@ -27,6 +27,18 @@ body { background:#020617; color:white; font-family:Arial; }
     text-align:center;
     display:none;
 }
+input, button {
+    padding:10px;
+    margin:5px;
+    border-radius:6px;
+    border:none;
+}
+
+button {
+    background:#06b6d4;
+    color:white;
+    cursor:pointer;
+}
 </style>
 </head>
 
@@ -42,16 +54,35 @@ body { background:#020617; color:white; font-family:Arial; }
 </div>
 
 <!-- DASHBOARD -->
+<!-- DASHBOARD -->
 <div id="dash">
-<div class="grid">
 
+<!-- 🔐 LOGIN SIMULATION -->
+<div class="card">
+<h3>🔐 Login Simulation</h3>
+
+<form method="POST">
+<input name="username" placeholder="Username" required>
+<input name="password" type="password" placeholder="Password" required>
+<button type="submit">Login</button>
+</form>
+
+<p>{{ message }}</p>
+
+<!-- 🔥 ATTACK SIMULATOR -->
+<button onclick="simulateAttack()">⚡ Simulate Attack</button>
+
+</div>
+
+<!-- KPI -->
+<div class="grid">
 <div class="card"><h3>Total Attacks</h3><p id="fail"></p></div>
 <div class="card"><h3>Success</h3><p id="success"></p></div>
 <div class="card"><h3>Blocked IPs</h3><p id="ipCount"></p></div>
 <div class="card"><h3>Blocked Users</h3><p id="userCount"></p></div>
-
 </div>
 
+<!-- GRAPHS -->
 <div class="card">
 <h3>Attack Timeline</h3>
 <canvas id="lineChart"></canvas>
@@ -61,8 +92,8 @@ body { background:#020617; color:white; font-family:Arial; }
 <h3>Success vs Failure</h3>
 <canvas id="pieChart"></canvas>
 </div>
-</div>
 
+</div>
 <!-- LOGS -->
 <div id="logs" class="hidden">
 <div class="card">
@@ -92,7 +123,15 @@ body { background:#020617; color:white; font-family:Arial; }
 
 <script>
 let lineChart, pieChart;
-
+function simulateAttack(){
+    for(let i=0;i<10;i++){
+        fetch("/",{
+            method:"POST",
+            headers:{'Content-Type':'application/x-www-form-urlencoded'},
+            body:"username=hacker&password=wrong"
+        });
+    }
+}
 function showTab(id){
 document.querySelectorAll("#dash,#logs,#control").forEach(d=>d.classList.add("hidden"));
 document.getElementById(id).classList.remove("hidden");
