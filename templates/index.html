@@ -1,159 +1,212 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>SOC Platform</title>
+<title>SOC Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body { margin:0; font-family:Segoe UI; background:#020617; color:white; }
+body {
+    font-family: Arial;
+    margin:0;
+    background:#f8fafc;
+    color:#1e293b;
+}
 
-/* Sidebar */
+/* layout */
+.container { display:flex; }
 .sidebar {
-width:220px;
-height:100vh;
-position:fixed;
-background:#020617;
-border-right:1px solid #0ea5e9;
-padding:20px;
+    width:220px;
+    background:#1e293b;
+    color:white;
+    height:100vh;
+    padding:20px;
 }
-.sidebar div { margin:20px 0; cursor:pointer; }
-.sidebar div:hover { color:#0ea5e9; }
+.sidebar div {
+    margin:15px 0;
+    cursor:pointer;
+}
 
-/* Main */
-.main { margin-left:240px; padding:20px; }
+.main {
+    flex:1;
+    padding:20px;
+}
 
-/* Cards */
+/* cards */
 .card {
-background:#0f172a;
-padding:20px;
-border-radius:12px;
-margin:10px;
-box-shadow:0 0 15px rgba(0,255,255,0.2);
+    background:white;
+    padding:15px;
+    margin-bottom:15px;
+    border-radius:8px;
+    box-shadow:0 2px 5px rgba(0,0,0,0.1);
 }
 
-.grid { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
+.grid {
+    display:grid;
+    grid-template-columns: repeat(4,1fr);
+    gap:10px;
+}
 
-.safe { background:green; padding:10px; }
-.danger { background:red; padding:10px; }
+h1 { margin-bottom:10px; }
 
-input,button { padding:10px; margin:5px; border-radius:5px; border:none; }
-button { background:#0ea5e9; color:white; cursor:pointer; }
+/* status */
+.status {
+    padding:10px;
+    border-radius:5px;
+    margin-bottom:10px;
+}
+.safe { background:#dcfce7; }
+.alert { background:#fee2e2; }
+
+/* form */
+input,button {
+    padding:8px;
+    margin:5px;
+}
+button {
+    background:#2563eb;
+    color:white;
+    border:none;
+}
+
+/* table */
+table {
+    width:100%;
+    border-collapse:collapse;
+}
+td,th {
+    border:1px solid #ddd;
+    padding:6px;
+}
 
 .hidden { display:none; }
+
+.low { color:green; }
+.medium { color:orange; }
+.high { color:red; }
 </style>
 </head>
 
 <body>
 
+<div class="container">
+
 <div class="sidebar">
-<h2>🔐 SOC</h2>
-<div onclick="showTab('dash')">Dashboard</div>
-<div onclick="showTab('logs')">Logs</div>
-<div onclick="showTab('control')">Control</div>
+<h2>SOC</h2>
+<div onclick="tab('dash')">Dashboard</div>
+<div onclick="tab('logs')">Logs</div>
+<div onclick="tab('control')">Control</div>
 </div>
 
 <div class="main">
 
-<h1>Security Operations Center</h1>
-<div id="status" class="safe">SYSTEM SECURE</div>
+<h1>Security Dashboard</h1>
+
+<div id="status" class="status safe">System normal</div>
 
 <div id="dash">
 
 <div class="card">
-<h3>Login Simulation</h3>
 <form method="POST">
-<input name="username" placeholder="Username">
-<input name="password" type="password" placeholder="Password">
+<input name="username" placeholder="username">
+<input name="password" type="password">
 <button>Login</button>
 </form>
-<button onclick="simulateAttack()">⚡ Simulate Attack</button>
+
+<button onclick="simulate()">Simulate Attack</button>
 <p>{{ message }}</p>
 </div>
 
 <div class="grid">
-<div class="card"><h3>Attacks</h3><h1 id="fail"></h1></div>
-<div class="card"><h3>Success</h3><h1 id="success"></h1></div>
-<div class="card"><h3>Blocked IPs</h3><h1 id="ipCount"></h1></div>
-<div class="card"><h3>Top Attacker</h3><h1 id="topIP"></h1></div>
+<div class="card">Attacks: <span id="fail"></span></div>
+<div class="card">Success: <span id="success"></span></div>
+<div class="card">Blocked: <span id="blocked"></span></div>
+<div class="card">Top IP: <span id="top"></span></div>
 </div>
 
-<div class="card"><canvas id="lineChart"></canvas></div>
-<div class="card"><canvas id="pieChart"></canvas></div>
+<div class="card">
+<canvas id="line"></canvas>
+</div>
+
+<div class="card">
+<canvas id="pie"></canvas>
+</div>
 
 </div>
 
 <div id="logs" class="hidden">
-<table border="1">
-<tr><th>IP</th><th>User</th><th>Threat</th><th>Action</th></tr>
-<tbody id="logTable"></tbody>
+<div class="card">
+<table>
+<tr><th>IP</th><th>User</th><th>Threat</th><th>Type</th></tr>
+<tbody id="log"></tbody>
 </table>
+</div>
 </div>
 
 <div id="control" class="hidden">
-<ul id="ips"></ul>
-<ul id="users"></ul>
-<button onclick="window.location='/export_logs'">Export Logs</button>
+<div class="card">
+<button onclick="reset()">Reset</button>
+<button onclick="exportLogs()">Export Logs</button>
+</div>
 </div>
 
+</div>
 </div>
 
 <script>
-let lineChart,pieChart;
+let lineChart, pieChart;
 
-function showTab(id){
-document.querySelectorAll("#dash,#logs,#control").forEach(d=>d.classList.add("hidden"));
+function tab(id){
+document.querySelectorAll("#dash,#logs,#control").forEach(x=>x.classList.add("hidden"));
 document.getElementById(id).classList.remove("hidden");
 }
 
 async function load(){
-const res=await fetch('/logs',{headers:{'x-api-key':'soc-secret-key'}});
+const res=await fetch("/logs",{headers:{"x-api-key":"soc-secret-key"}});
 const data=await res.json();
 
 fail.innerText=data.fail;
 success.innerText=data.success;
-ipCount.innerText=data.blocked_ips.length;
-topIP.innerText=data.top_attacker;
+blocked.innerText=data.blocked_ips.length;
+top.innerText=data.top_ip;
 
-if(data.fail>10){
-status.className="danger";
-status.innerText="UNDER ATTACK";
-}else{
-status.className="safe";
-status.innerText="SYSTEM SECURE";
-}
+status.className = data.fail>10 ? "status alert" : "status safe";
 
 const times=data.timeline.map(t=>t.time);
 const counts=data.timeline.map(t=>t.count);
 
 if(lineChart) lineChart.destroy();
-lineChart=new Chart(document.getElementById("lineChart"),{
+lineChart=new Chart(document.getElementById("line"),{
 type:"line",
-data:{labels:times,datasets:[{data:counts,borderColor:"#0ea5e9"}]}
+data:{labels:times,datasets:[{data:counts}]}
 });
 
 if(pieChart) pieChart.destroy();
-pieChart=new Chart(document.getElementById("pieChart"),{
+pieChart=new Chart(document.getElementById("pie"),{
 type:"pie",
 data:{labels:["Success","Fail"],datasets:[{data:[data.success,data.fail]}]}
 });
 
-logTable.innerHTML=data.logs.map(l=>`
+log.innerHTML=data.logs.map(l=>`
 <tr>
 <td>${l.ip}</td>
 <td>${l.user}</td>
-<td>${l.threat}</td>
-<td>${l.action}</td>
+<td class="${l.threat.toLowerCase()}">${l.threat}</td>
+<td>${l.type}</td>
 </tr>`).join("");
-
-ips.innerHTML=data.blocked_ips.map(ip=>`<li>${ip}</li>`).join("");
-users.innerHTML=data.blocked_users.map(u=>`<li>${u}</li>`).join("");
 }
 
-function simulateAttack(){
+function simulate(){
 for(let i=0;i<10;i++){
-fetch("/",{method:"POST",headers:{'Content-Type':'application/x-www-form-urlencoded'},body:"username=hacker&password=wrong"});
+fetch("/",{
+method:"POST",
+headers:{"Content-Type":"application/x-www-form-urlencoded"},
+body:"username=hacker&password=wrong"
+});
 }
 }
+
+function reset(){ fetch("/reset"); }
+function exportLogs(){ window.location="/export"; }
 
 setInterval(load,2000);
 </script>
