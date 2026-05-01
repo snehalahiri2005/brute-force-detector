@@ -7,15 +7,33 @@
 <style>
 body { background:#020617; color:white; font-family:Arial; }
 .tabs { display:flex; gap:20px; padding:10px; cursor:pointer; }
-.card { background:#0f172a; padding:15px; border-radius:10px; margin:10px; }
+.card {
+    background:#0f172a;
+    padding:20px;
+    border-radius:12px;
+    margin:10px;
+    box-shadow:0 0 15px rgba(0,255,255,0.2);
+    transition:0.3s;
+}
+.card:hover { transform:scale(1.02); }
+
 .hidden { display:none; }
+
 .grid { display:grid; grid-template-columns: repeat(2,1fr); gap:20px; }
+
+.alert {
+    background:red;
+    padding:10px;
+    text-align:center;
+    display:none;
+}
 </style>
 </head>
 
 <body>
 
 <h1>🔐 SOC Platform</h1>
+<div id="alert" class="alert">⚠️ HIGH THREAT DETECTED</div>
 
 <div class="tabs">
 <span onclick="showTab('dash')">Dashboard</span>
@@ -23,21 +41,41 @@ body { background:#020617; color:white; font-family:Arial; }
 <span onclick="showTab('control')">Control</span>
 </div>
 
+<!-- DASHBOARD -->
 <div id="dash">
 <div class="grid">
+
 <div class="card"><h3>Total Attacks</h3><p id="fail"></p></div>
 <div class="card"><h3>Success</h3><p id="success"></p></div>
+<div class="card"><h3>Blocked IPs</h3><p id="ipCount"></p></div>
+<div class="card"><h3>Blocked Users</h3><p id="userCount"></p></div>
+
 </div>
 
-<div class="card"><canvas id="line"></canvas></div>
-<div class="card"><canvas id="pie"></canvas></div>
+<div class="card">
+<h3>Attack Timeline</h3>
+<canvas id="lineChart"></canvas>
 </div>
 
+<div class="card">
+<h3>Success vs Failure</h3>
+<canvas id="pieChart"></canvas>
+</div>
+</div>
+
+<!-- LOGS -->
 <div id="logs" class="hidden">
-<div class="card"><table id="logTable"></table></div>
+<div class="card">
+<table border="1">
+<tr><th>IP</th><th>User</th><th>Time</th><th>Threat</th><th>Action</th></tr>
+<tbody id="logTable"></tbody>
+</table>
+</div>
 </div>
 
+<!-- CONTROL -->
 <div id="control" class="hidden">
+
 <div class="card">
 <h3>Blocked IPs</h3>
 <ul id="ips"></ul>
@@ -49,9 +87,12 @@ body { background:#020617; color:white; font-family:Arial; }
 </div>
 
 <button onclick="window.location='/export_logs'">Download Logs</button>
+
 </div>
 
 <script>
+let lineChart, pieChart;
+
 function showTab(id){
 document.querySelectorAll("#dash,#logs,#control").forEach(d=>d.classList.add("hidden"));
 document.getElementById(id).classList.remove("hidden");
@@ -61,11 +102,32 @@ async function load(){
 const res = await fetch('/logs',{headers:{'x-api-key':'soc-secret-key'}});
 const data = await res.json();
 
+// KPI
 document.getElementById("fail").innerText = data.fail;
 document.getElementById("success").innerText = data.success;
+document.getElementById("ipCount").innerText = data.blocked_ips.length;
+document.getElementById("userCount").innerText = data.blocked_users.length;
 
+// GRAPH
+const times = data.timeline.map(t=>t.time);
+const counts = data.timeline.map(t=>t.count);
+
+if(lineChart) lineChart.destroy();
+lineChart = new Chart(document.getElementById("lineChart"),{
+type:"line",
+data:{labels:times,datasets:[{label:"Attack Rate",data:counts,borderColor:"cyan"}]}
+});
+
+if(pieChart) pieChart.destroy();
+pieChart = new Chart(document.getElementById("pieChart"),{
+type:"pie",
+data:{labels:["Success","Fail"],datasets:[{data:[data.success,data.fail]}]}
+});
+
+// LOG TABLE
 document.getElementById("logTable").innerHTML =
-data.logs.map(l=>`<tr>
+data.logs.map(l=>`
+<tr>
 <td>${l.ip}</td>
 <td>${l.user}</td>
 <td>${l.time}</td>
@@ -73,15 +135,30 @@ data.logs.map(l=>`<tr>
 <td>${l.action}</td>
 </tr>`).join("");
 
+// BLOCKED LIST
 document.getElementById("ips").innerHTML =
-data.blocked_ips.map(ip=>`<li>${ip}</li>`).join("");
+data.blocked_ips.map(ip=>`<li>${ip} <button onclick="unblockIP('${ip}')">Unblock</button></li>`).join("");
 
 document.getElementById("users").innerHTML =
-data.blocked_users.map(u=>`<li>${u}</li>`).join("");
+data.blocked_users.map(u=>`<li>${u} <button onclick="unblockUser('${u}')">Unblock</button></li>`).join("");
+
+// ALERT
+if(data.fail > 10){
+document.getElementById("alert").style.display="block";
+}else{
+document.getElementById("alert").style.display="none";
+}
+}
+
+function unblockIP(ip){
+fetch('/unblock_ip/'+ip).then(load);
+}
+
+function unblockUser(u){
+fetch('/unblock_user/'+u).then(load);
 }
 
 setInterval(load,2000);
 </script>
-
 </body>
 </html>
