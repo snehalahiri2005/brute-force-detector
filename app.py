@@ -6,6 +6,7 @@ app = Flask(__name__)
 attempts = {}
 blocked_ips = {}
 logs = []
+timeline = []
 
 VALID_USER = "admin"
 VALID_PASS = "1234"
@@ -20,11 +21,12 @@ def get_location(ip):
 @app.route("/", methods=["GET", "POST"])
 def login():
     message = ""
-    ip = request.remote_addr or "unknown"
+    ip = request.remote_addr or "127.0.0.1"
 
+    # Block check
     if ip in blocked_ips:
         if datetime.now() < blocked_ips[ip]:
-            return "🚫 BLOCKED: Suspicious activity detected!"
+            return "🚫 BLOCKED: Suspicious activity!"
         else:
             del blocked_ips[ip]
 
@@ -47,15 +49,26 @@ def login():
 
             if len(attempts[ip]) > MAX_ATTEMPTS:
                 blocked_ips[ip] = now + timedelta(seconds=BLOCK_TIME)
-                message = "🚫 BLOCKED: Too many attempts!"
+                message = "🚫 BLOCKED!"
             else:
                 message = f"❌ Failed Attempt {len(attempts[ip])}"
 
+        # Attack type
+        attack_type = "Brute Force" if len(attempts.get(ip, [])) > 3 else "Normal"
+
+        # Logs
         logs.append({
             "ip": ip,
             "time": now.strftime("%H:%M:%S"),
             "status": status,
-            "location": get_location(ip)
+            "location": get_location(ip),
+            "type": attack_type
+        })
+
+        # Timeline for graph
+        timeline.append({
+            "time": now.strftime("%H:%M:%S"),
+            "count": len(attempts.get(ip, []))
         })
 
     return render_template("index.html", message=message)
@@ -69,9 +82,16 @@ def get_logs():
         "attempts": {ip: len(times) for ip, times in attempts.items()},
         "blocked": list(blocked_ips.keys()),
         "logs": logs[-10:],
+        "timeline": timeline[-10:],
         "success": success,
         "fail": fail
     })
+
+@app.route("/unblock/<ip>")
+def unblock(ip):
+    if ip in blocked_ips:
+        del blocked_ips[ip]
+    return "Unblocked"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)

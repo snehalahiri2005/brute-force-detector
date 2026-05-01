@@ -5,7 +5,12 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        body { background:#020617; color:white; font-family:Arial; }
+        body {
+            background:#020617;
+            color:white;
+            font-family:Arial;
+        }
+
         h1 { text-align:center; }
 
         .grid {
@@ -36,8 +41,8 @@
 
 <body>
 
-<h1>🔐 SOC Cyber Attack Dashboard</h1>
-<div class="alert" id="alert">⚠️ HIGH THREAT DETECTED</div>
+<h1>🔐 Mini SOC Cyber Dashboard</h1>
+<div id="alert" class="alert">⚠️ HIGH THREAT DETECTED</div>
 
 <div class="grid">
 
@@ -57,20 +62,30 @@
 </div>
 
 <div class="card">
-<h3>Attack Graph</h3>
+<h3>Attack Timeline</h3>
 <canvas id="line"></canvas>
 </div>
 
 <div class="card">
-<h3>Success vs Fail</h3>
+<h3>Success vs Failure</h3>
 <canvas id="pie"></canvas>
+</div>
+
+<div class="card">
+<h3>Blocked IPs</h3>
+<ul id="blocked"></ul>
+</div>
+
+<div class="card">
+<h3>Geo Attacks</h3>
+<ul id="geo"></ul>
 </div>
 
 <div class="card" style="grid-column: span 2;">
 <h3>Logs</h3>
 <table>
 <thead>
-<tr><th>IP</th><th>Time</th><th>Status</th><th>Location</th></tr>
+<tr><th>IP</th><th>Time</th><th>Status</th><th>Location</th><th>Type</th></tr>
 </thead>
 <tbody id="logs"></tbody>
 </table>
@@ -85,14 +100,22 @@ async function loadData() {
     const res = await fetch('/logs');
     const data = await res.json();
 
-    const ips = Object.keys(data.attempts);
-    const values = Object.values(data.attempts);
+    // LINE GRAPH (FIXED)
+    const times = data.timeline.map(t => t.time);
+    const counts = data.timeline.map(t => t.count);
 
-    // LINE CHART
     if(lineChart) lineChart.destroy();
     lineChart = new Chart(document.getElementById('line'), {
         type:'line',
-        data:{ labels:ips, datasets:[{label:'Attempts', data:values, borderColor:'cyan'}]}
+        data:{
+            labels:times,
+            datasets:[{
+                label:'Attack Rate',
+                data:counts,
+                borderColor:'cyan',
+                fill:true
+            }]
+        }
     });
 
     // PIE
@@ -105,28 +128,35 @@ async function loadData() {
         }
     });
 
+    // BLOCKED
+    document.getElementById("blocked").innerHTML =
+        data.blocked.map(ip => `<li>${ip}</li>`).join("");
+
+    // GEO
+    document.getElementById("geo").innerHTML =
+        data.logs.map(l => `<li>${l.location} (${l.ip})</li>`).join("");
+
     // LOG TABLE
-    let table="";
-    data.logs.forEach(l=>{
-        table+=`<tr>
-        <td>${l.ip}</td>
-        <td>${l.time}</td>
-        <td>${l.status}</td>
-        <td>${l.location}</td>
-        </tr>`;
-    });
-    document.getElementById("logs").innerHTML = table;
+    document.getElementById("logs").innerHTML =
+        data.logs.map(l => `
+            <tr>
+            <td>${l.ip}</td>
+            <td>${l.time}</td>
+            <td>${l.status}</td>
+            <td>${l.location}</td>
+            <td>${l.type}</td>
+            </tr>
+        `).join("");
 
     // THREAT LEVEL
-    let total = data.fail;
     let threat = document.getElementById("threat");
     let alert = document.getElementById("alert");
 
-    if(total < 5){
+    if(data.fail < 5){
         threat.innerText="LOW";
         alert.style.display="none";
     }
-    else if(total < 10){
+    else if(data.fail < 10){
         threat.innerText="MEDIUM";
         alert.style.display="none";
     }
