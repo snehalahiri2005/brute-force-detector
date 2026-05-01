@@ -4,7 +4,7 @@ pipeline {
     stages {
         stage('Clone Code') {
             steps {
-                git 'https://github.com/YOUR_USERNAME/brute-force-detector.git'
+                git 'https://github.com/snehalahiri2005/brute-force-detector.git'
             }
         }
 
