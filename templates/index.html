@@ -1,175 +1,142 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Cyber Threat Dashboard</title>
+    <title>Cyber SOC Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
-        body {
-            background: #020617;
-            color: #e2e8f0;
-            font-family: Arial;
-        }
+        body { background:#020617; color:white; font-family:Arial; }
+        h1 { text-align:center; }
 
-        h1 {
-            text-align: center;
-        }
-
-        .container {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
-            padding: 20px;
+        .grid {
+            display:grid;
+            grid-template-columns: repeat(2,1fr);
+            gap:20px;
+            padding:20px;
         }
 
         .card {
-            background: #0f172a;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,255,255,0.2);
+            background:#0f172a;
+            padding:20px;
+            border-radius:10px;
+            box-shadow:0 0 10px cyan;
         }
 
-        .status {
-            font-size: 20px;
-            font-weight: bold;
-        }
+        table { width:100%; }
+        td,th { padding:8px; border-bottom:1px solid #334155; }
 
-        .low { color: green; }
-        .medium { color: orange; }
-        .high { color: red; }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        td, th {
-            padding: 8px;
-            border-bottom: 1px solid #334155;
-        }
-
-        input, button {
-            padding: 10px;
-            margin: 5px;
-        }
-
-        button {
-            background: red;
-            color: white;
-            border: none;
+        .alert {
+            background:red;
+            padding:10px;
+            text-align:center;
+            display:none;
         }
     </style>
 </head>
 
 <body>
 
-<h1>🔐 Cyber Security SOC Dashboard</h1>
+<h1>🔐 SOC Cyber Attack Dashboard</h1>
+<div class="alert" id="alert">⚠️ HIGH THREAT DETECTED</div>
 
-<div class="container">
+<div class="grid">
 
-    <!-- LOGIN -->
-    <div class="card">
-        <h3>Login Simulator</h3>
-        <form method="POST">
-            <input name="username" placeholder="Username">
-            <input name="password" type="password" placeholder="Password">
-            <button>Login</button>
-        </form>
-        <p>{{ message }}</p>
-    </div>
+<div class="card">
+<h3>Login</h3>
+<form method="POST">
+<input name="username" placeholder="Username">
+<input name="password" type="password" placeholder="Password">
+<button>Login</button>
+</form>
+<p>{{ message }}</p>
+</div>
 
-    <!-- THREAT LEVEL -->
-    <div class="card">
-        <h3>Threat Level</h3>
-        <p id="threat" class="status">LOW</p>
-    </div>
+<div class="card">
+<h3>Threat Level</h3>
+<p id="threat">LOW</p>
+</div>
 
-    <!-- GRAPH -->
-    <div class="card">
-        <h3>Attack Attempts</h3>
-        <canvas id="lineChart"></canvas>
-    </div>
+<div class="card">
+<h3>Attack Graph</h3>
+<canvas id="line"></canvas>
+</div>
 
-    <!-- BLOCKED -->
-    <div class="card">
-        <h3>Blocked IPs</h3>
-        <ul id="blocked"></ul>
-    </div>
+<div class="card">
+<h3>Success vs Fail</h3>
+<canvas id="pie"></canvas>
+</div>
 
-    <!-- LOG TABLE -->
-    <div class="card" style="grid-column: span 2;">
-        <h3>Recent Activity</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>IP</th>
-                    <th>Attempts</th>
-                </tr>
-            </thead>
-            <tbody id="logTable"></tbody>
-        </table>
-    </div>
+<div class="card" style="grid-column: span 2;">
+<h3>Logs</h3>
+<table>
+<thead>
+<tr><th>IP</th><th>Time</th><th>Status</th><th>Location</th></tr>
+</thead>
+<tbody id="logs"></tbody>
+</table>
+</div>
 
 </div>
 
 <script>
-let chart;
+let lineChart, pieChart;
 
 async function loadData() {
     const res = await fetch('/logs');
     const data = await res.json();
 
-    const labels = Object.keys(data.attempts);
+    const ips = Object.keys(data.attempts);
     const values = Object.values(data.attempts);
 
-    // GRAPH
-    if (chart) chart.destroy();
-    chart = new Chart(document.getElementById('lineChart'), {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Attempts',
-                data: values,
-                borderColor: 'cyan'
-            }]
+    // LINE CHART
+    if(lineChart) lineChart.destroy();
+    lineChart = new Chart(document.getElementById('line'), {
+        type:'line',
+        data:{ labels:ips, datasets:[{label:'Attempts', data:values, borderColor:'cyan'}]}
+    });
+
+    // PIE
+    if(pieChart) pieChart.destroy();
+    pieChart = new Chart(document.getElementById('pie'), {
+        type:'pie',
+        data:{
+            labels:['Success','Fail'],
+            datasets:[{data:[data.success, data.fail]}]
         }
     });
 
-    // BLOCKED
-    let blocked = document.getElementById("blocked");
-    blocked.innerHTML = "";
-    data.blocked.forEach(ip => {
-        let li = document.createElement("li");
-        li.innerText = ip;
-        blocked.appendChild(li);
+    // LOG TABLE
+    let table="";
+    data.logs.forEach(l=>{
+        table+=`<tr>
+        <td>${l.ip}</td>
+        <td>${l.time}</td>
+        <td>${l.status}</td>
+        <td>${l.location}</td>
+        </tr>`;
     });
-
-    // TABLE
-    let table = document.getElementById("logTable");
-    table.innerHTML = "";
-    labels.forEach((ip, i) => {
-        let row = `<tr><td>${ip}</td><td>${values[i]}</td></tr>`;
-        table.innerHTML += row;
-    });
+    document.getElementById("logs").innerHTML = table;
 
     // THREAT LEVEL
-    let total = values.reduce((a,b)=>a+b,0);
+    let total = data.fail;
     let threat = document.getElementById("threat");
+    let alert = document.getElementById("alert");
 
-    if (total < 5) {
-        threat.innerText = "LOW";
-        threat.className = "status low";
-    } else if (total < 10) {
-        threat.innerText = "MEDIUM";
-        threat.className = "status medium";
-    } else {
-        threat.innerText = "HIGH";
-        threat.className = "status high";
+    if(total < 5){
+        threat.innerText="LOW";
+        alert.style.display="none";
+    }
+    else if(total < 10){
+        threat.innerText="MEDIUM";
+        alert.style.display="none";
+    }
+    else{
+        threat.innerText="HIGH";
+        alert.style.display="block";
     }
 }
 
-setInterval(loadData, 2000);
+setInterval(loadData,2000);
 </script>
 
 </body>
