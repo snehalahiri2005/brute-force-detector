@@ -1,26 +1,51 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Cyber Security Dashboard</title>
+    <title>Cyber Threat Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         body {
+            background: #020617;
+            color: #e2e8f0;
             font-family: Arial;
-            background: #0f172a;
-            color: white;
-            text-align: center;
         }
 
         h1 {
-            margin-top: 20px;
+            text-align: center;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            padding: 20px;
         }
 
         .card {
-            background: #1e293b;
+            background: #0f172a;
             padding: 20px;
-            margin: 20px;
             border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,255,255,0.2);
+        }
+
+        .status {
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .low { color: green; }
+        .medium { color: orange; }
+        .high { color: red; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        td, th {
+            padding: 8px;
+            border-bottom: 1px solid #334155;
         }
 
         input, button {
@@ -38,29 +63,58 @@
 
 <body>
 
-<h1>🔐 Cyber Security Dashboard</h1>
+<h1>🔐 Cyber Security SOC Dashboard</h1>
 
-<div class="card">
-    <h2>Login Simulator</h2>
-    <form method="POST">
-        <input name="username" placeholder="Username">
-        <input name="password" type="password" placeholder="Password">
-        <button>Login</button>
-    </form>
-    <p>{{ message }}</p>
-</div>
+<div class="container">
 
-<div class="card">
-    <h2>📊 Attack Attempts</h2>
-    <canvas id="chart"></canvas>
-</div>
+    <!-- LOGIN -->
+    <div class="card">
+        <h3>Login Simulator</h3>
+        <form method="POST">
+            <input name="username" placeholder="Username">
+            <input name="password" type="password" placeholder="Password">
+            <button>Login</button>
+        </form>
+        <p>{{ message }}</p>
+    </div>
 
-<div class="card">
-    <h2>🚫 Blocked IPs</h2>
-    <ul id="blocked"></ul>
+    <!-- THREAT LEVEL -->
+    <div class="card">
+        <h3>Threat Level</h3>
+        <p id="threat" class="status">LOW</p>
+    </div>
+
+    <!-- GRAPH -->
+    <div class="card">
+        <h3>Attack Attempts</h3>
+        <canvas id="lineChart"></canvas>
+    </div>
+
+    <!-- BLOCKED -->
+    <div class="card">
+        <h3>Blocked IPs</h3>
+        <ul id="blocked"></ul>
+    </div>
+
+    <!-- LOG TABLE -->
+    <div class="card" style="grid-column: span 2;">
+        <h3>Recent Activity</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>IP</th>
+                    <th>Attempts</th>
+                </tr>
+            </thead>
+            <tbody id="logTable"></tbody>
+        </table>
+    </div>
+
 </div>
 
 <script>
+let chart;
+
 async function loadData() {
     const res = await fetch('/logs');
     const data = await res.json();
@@ -68,28 +122,54 @@ async function loadData() {
     const labels = Object.keys(data.attempts);
     const values = Object.values(data.attempts);
 
-    new Chart(document.getElementById('chart'), {
-        type: 'bar',
+    // GRAPH
+    if (chart) chart.destroy();
+    chart = new Chart(document.getElementById('lineChart'), {
+        type: 'line',
         data: {
             labels: labels,
             datasets: [{
                 label: 'Attempts',
-                data: values
+                data: values,
+                borderColor: 'cyan'
             }]
         }
     });
 
-    let blockedList = document.getElementById("blocked");
-    blockedList.innerHTML = "";
+    // BLOCKED
+    let blocked = document.getElementById("blocked");
+    blocked.innerHTML = "";
     data.blocked.forEach(ip => {
         let li = document.createElement("li");
         li.innerText = ip;
-        blockedList.appendChild(li);
+        blocked.appendChild(li);
     });
+
+    // TABLE
+    let table = document.getElementById("logTable");
+    table.innerHTML = "";
+    labels.forEach((ip, i) => {
+        let row = `<tr><td>${ip}</td><td>${values[i]}</td></tr>`;
+        table.innerHTML += row;
+    });
+
+    // THREAT LEVEL
+    let total = values.reduce((a,b)=>a+b,0);
+    let threat = document.getElementById("threat");
+
+    if (total < 5) {
+        threat.innerText = "LOW";
+        threat.className = "status low";
+    } else if (total < 10) {
+        threat.innerText = "MEDIUM";
+        threat.className = "status medium";
+    } else {
+        threat.innerText = "HIGH";
+        threat.className = "status high";
+    }
 }
 
-loadData();
-setInterval(loadData, 3000);
+setInterval(loadData, 2000);
 </script>
 
 </body>
