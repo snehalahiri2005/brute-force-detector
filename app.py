@@ -1,34 +1,43 @@
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, send_file
 from datetime import datetime, timedelta
+import csv
+import io
 
 app = Flask(__name__)
 
+# --- STATE ---
 attempts = {}
 blocked_ips = {}
+blocked_users = {}
 logs = []
 timeline = []
 
-VALID_USER = "admin"
-VALID_PASS = "1234"
+# --- CONFIG ---
+VALID_USERS = {
+    "admin": {"password": "1234", "role": "admin"},
+    "user": {"password": "1234", "role": "user"}
+}
 
+API_KEY = "soc-secret-key"
 MAX_ATTEMPTS = 5
 BLOCK_TIME = 60
 
+# --- HELPERS ---
 def get_location(ip):
     locations = ["India", "USA", "Germany", "UK"]
     return locations[hash(ip) % len(locations)]
 
+def require_api_key(req):
+    return req.headers.get("x-api-key") == API_KEY
+
+# --- ROUTES ---
 @app.route("/", methods=["GET", "POST"])
 def login():
     message = ""
     ip = request.remote_addr or "127.0.0.1"
 
-    # Block check
-    if ip in blocked_ips:
-        if datetime.now() < blocked_ips[ip]:
-            return "🚫 BLOCKED: Suspicious activity!"
-        else:
-            del blocked_ips[ip]
+    if ip in blocked_ips and datetime.now() < blocked_ips[ip]:
+        return "🚫 IP BLOCKED"
 
     if request.method == "POST":
         username = request.form["username"]
@@ -37,7 +46,11 @@ def login():
         now = datetime.now()
         status = "FAILED"
 
-        if username == VALID_USER and password == VALID_PASS:
+        # USER BLOCK CHECK
+        if username in blocked_users and datetime.now() < blocked_users[username]:
+            return "🚫 USER BLOCKED"
+
+        if username in VALID_USERS and VALID_USERS[username]["password"] == password:
             status = "SUCCESS"
             message = "✅ Login successful"
         else:
@@ -49,39 +62,28 @@ def login():
 
             count = len(attempts[ip])
 
-            # 🔥 Threat Detection + Response Engine
+            # 🔥 THREAT ENGINE
             if count <= 3:
-                threat = "LOW"
-                action = "LOGGED"
-
+                threat, action = "LOW", "LOGGED"
             elif count <= 5:
-                threat = "MEDIUM"
-                action = "WARNING"
-
+                threat, action = "MEDIUM", "WARNING"
             elif count <= 8:
-                threat = "HIGH"
+                threat, action = "HIGH", "IP BLOCKED"
                 blocked_ips[ip] = now + timedelta(seconds=BLOCK_TIME)
-                action = "IP BLOCKED"
-
             else:
-                threat = "CRITICAL"
-                blocked_ips[ip] = now + timedelta(seconds=300)
-                action = "PERMANENT BLOCK"
+                threat, action = "CRITICAL", "USER BLOCKED"
+                blocked_users[username] = now + timedelta(seconds=300)
 
             message = f"❌ Attempt {count} | {threat}"
 
-        # Attack Type
+        # ATTACK TYPE
         count = len(attempts.get(ip, []))
-        if count > 6:
-            attack_type = "Brute Force"
-        elif count > 3:
-            attack_type = "Password Spray"
-        else:
-            attack_type = "Normal"
+        attack_type = "Brute Force" if count > 6 else ("Password Spray" if count > 3 else "Normal")
 
-        # Logs
+        # LOG
         logs.append({
             "ip": ip,
+            "user": username,
             "time": now.strftime("%H:%M:%S"),
             "status": status,
             "location": get_location(ip),
@@ -90,33 +92,56 @@ def login():
             "action": action if status == "FAILED" else "LOGIN SUCCESS"
         })
 
-        # Timeline (for graph)
-        timeline.append({
-            "time": now.strftime("%H:%M:%S"),
-            "count": len(attempts.get(ip, []))
-        })
+        timeline.append({"time": now.strftime("%H:%M:%S"), "count": count})
 
     return render_template("index.html", message=message)
 
+
 @app.route("/logs")
 def get_logs():
+    if not require_api_key(request):
+        return jsonify({"error": "Unauthorized"}), 403
+
     success = sum(1 for l in logs if l["status"] == "SUCCESS")
     fail = sum(1 for l in logs if l["status"] == "FAILED")
 
     return jsonify({
-        "attempts": {ip: len(times) for ip, times in attempts.items()},
-        "blocked": list(blocked_ips.keys()),
-        "logs": logs[-10:],
-        "timeline": timeline[-10:],
+        "logs": logs[-20:],
+        "timeline": timeline[-20:],
+        "blocked_ips": list(blocked_ips.keys()),
+        "blocked_users": list(blocked_users.keys()),
         "success": success,
         "fail": fail
     })
 
-@app.route("/unblock/<ip>")
-def unblock(ip):
-    if ip in blocked_ips:
-        del blocked_ips[ip]
-    return "Unblocked"
+
+@app.route("/unblock_ip/<ip>")
+def unblock_ip(ip):
+    blocked_ips.pop(ip, None)
+    return "IP Unblocked"
+
+
+@app.route("/unblock_user/<user>")
+def unblock_user(user):
+    blocked_users.pop(user, None)
+    return "User Unblocked"
+
+
+@app.route("/export_logs")
+def export_logs():
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=logs[0].keys())
+    writer.writeheader()
+    writer.writerows(logs)
+
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode()),
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name="logs.csv"
+    )
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
