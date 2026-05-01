@@ -5,92 +5,46 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body {
-    margin:0;
-    font-family: 'Segoe UI';
-    background: linear-gradient(135deg,#020617,#020617);
-    color:white;
-}
+body { margin:0; font-family:Segoe UI; background:#020617; color:white; }
 
-/* SIDEBAR */
+/* Sidebar */
 .sidebar {
-    width:220px;
-    height:100vh;
-    position:fixed;
-    background:#020617;
-    border-right:1px solid #0ea5e9;
-    padding:20px;
+width:220px;
+height:100vh;
+position:fixed;
+background:#020617;
+border-right:1px solid #0ea5e9;
+padding:20px;
 }
+.sidebar div { margin:20px 0; cursor:pointer; }
+.sidebar div:hover { color:#0ea5e9; }
 
-.sidebar h2 { color:#0ea5e9; }
+/* Main */
+.main { margin-left:240px; padding:20px; }
 
-.sidebar div {
-    margin:20px 0;
-    cursor:pointer;
-}
-
-.sidebar div:hover {
-    color:#0ea5e9;
-}
-
-/* MAIN */
-.main {
-    margin-left:240px;
-    padding:20px;
-}
-
-/* CARDS */
+/* Cards */
 .card {
-    background:rgba(15,23,42,0.8);
-    backdrop-filter: blur(10px);
-    padding:20px;
-    border-radius:12px;
-    margin:10px;
-    box-shadow:0 0 20px rgba(0,255,255,0.2);
-    transition:0.3s;
+background:#0f172a;
+padding:20px;
+border-radius:12px;
+margin:10px;
+box-shadow:0 0 15px rgba(0,255,255,0.2);
 }
 
-.card:hover { transform:scale(1.02); }
+.grid { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
 
-.grid {
-    display:grid;
-    grid-template-columns: repeat(4,1fr);
-    gap:20px;
-}
+.safe { background:green; padding:10px; }
+.danger { background:red; padding:10px; }
 
-/* STATUS */
-.status {
-    padding:10px;
-    border-radius:10px;
-    text-align:center;
-    margin-bottom:10px;
-}
-
-.safe { background:green; }
-.danger { background:red; }
-
-/* LOGIN */
-input,button {
-    padding:10px;
-    margin:5px;
-    border-radius:5px;
-    border:none;
-}
-
-button {
-    background:#0ea5e9;
-    color:white;
-    cursor:pointer;
-}
+input,button { padding:10px; margin:5px; border-radius:5px; border:none; }
+button { background:#0ea5e9; color:white; cursor:pointer; }
 
 .hidden { display:none; }
-
 </style>
 </head>
 
 <body>
 
-<!-- SIDEBAR -->
 <div class="sidebar">
 <h2>🔐 SOC</h2>
 <div onclick="showTab('dash')">Dashboard</div>
@@ -98,69 +52,46 @@ button {
 <div onclick="showTab('control')">Control</div>
 </div>
 
-<!-- MAIN -->
 <div class="main">
 
 <h1>Security Operations Center</h1>
+<div id="status" class="safe">SYSTEM SECURE</div>
 
-<div id="status" class="status safe">SYSTEM SECURE</div>
-
-<!-- DASHBOARD -->
 <div id="dash">
 
 <div class="card">
-<h3>🔐 Login Simulation</h3>
+<h3>Login Simulation</h3>
 <form method="POST">
 <input name="username" placeholder="Username">
 <input name="password" type="password" placeholder="Password">
 <button>Login</button>
 </form>
-
 <button onclick="simulateAttack()">⚡ Simulate Attack</button>
 <p>{{ message }}</p>
 </div>
 
 <div class="grid">
-<div class="card"><h3>Attacks</h3><h1 id="fail">0</h1></div>
-<div class="card"><h3>Success</h3><h1 id="success">0</h1></div>
-<div class="card"><h3>Blocked IPs</h3><h1 id="ipCount">0</h1></div>
-<div class="card"><h3>Blocked Users</h3><h1 id="userCount">0</h1></div>
+<div class="card"><h3>Attacks</h3><h1 id="fail"></h1></div>
+<div class="card"><h3>Success</h3><h1 id="success"></h1></div>
+<div class="card"><h3>Blocked IPs</h3><h1 id="ipCount"></h1></div>
+<div class="card"><h3>Top Attacker</h3><h1 id="topIP"></h1></div>
 </div>
 
-<div class="card">
-<h3>Attack Timeline</h3>
-<canvas id="lineChart"></canvas>
-</div>
-
-<div class="card">
-<h3>Success vs Failure</h3>
-<canvas id="pieChart"></canvas>
-</div>
+<div class="card"><canvas id="lineChart"></canvas></div>
+<div class="card"><canvas id="pieChart"></canvas></div>
 
 </div>
 
-<!-- LOGS -->
 <div id="logs" class="hidden">
-<div class="card">
 <table border="1">
-<tr><th>IP</th><th>User</th><th>Time</th><th>Threat</th><th>Action</th></tr>
+<tr><th>IP</th><th>User</th><th>Threat</th><th>Action</th></tr>
 <tbody id="logTable"></tbody>
 </table>
 </div>
-</div>
 
-<!-- CONTROL -->
 <div id="control" class="hidden">
-<div class="card">
-<h3>Blocked IPs</h3>
 <ul id="ips"></ul>
-</div>
-
-<div class="card">
-<h3>Blocked Users</h3>
 <ul id="users"></ul>
-</div>
-
 <button onclick="window.location='/export_logs'">Export Logs</button>
 </div>
 
@@ -175,32 +106,29 @@ document.getElementById(id).classList.remove("hidden");
 }
 
 async function load(){
-const res = await fetch('/logs',{headers:{'x-api-key':'soc-secret-key'}});
-const data = await res.json();
+const res=await fetch('/logs',{headers:{'x-api-key':'soc-secret-key'}});
+const data=await res.json();
 
-// KPI
 fail.innerText=data.fail;
 success.innerText=data.success;
 ipCount.innerText=data.blocked_ips.length;
-userCount.innerText=data.blocked_users.length;
+topIP.innerText=data.top_attacker;
 
-// STATUS
-if(data.fail > 10){
-status.innerText="⚠️ UNDER ATTACK";
-status.className="status danger";
+if(data.fail>10){
+status.className="danger";
+status.innerText="UNDER ATTACK";
 }else{
+status.className="safe";
 status.innerText="SYSTEM SECURE";
-status.className="status safe";
 }
 
-// GRAPH
 const times=data.timeline.map(t=>t.time);
 const counts=data.timeline.map(t=>t.count);
 
 if(lineChart) lineChart.destroy();
-lineChart=new Chart(lineChartEl=document.getElementById("lineChart"),{
+lineChart=new Chart(document.getElementById("lineChart"),{
 type:"line",
-data:{labels:times,datasets:[{label:"Attack Rate",data:counts,borderColor:"#0ea5e9"}]}
+data:{labels:times,datasets:[{data:counts,borderColor:"#0ea5e9"}]}
 });
 
 if(pieChart) pieChart.destroy();
@@ -209,28 +137,21 @@ type:"pie",
 data:{labels:["Success","Fail"],datasets:[{data:[data.success,data.fail]}]}
 });
 
-// LOGS
 logTable.innerHTML=data.logs.map(l=>`
 <tr>
 <td>${l.ip}</td>
 <td>${l.user}</td>
-<td>${l.time}</td>
 <td>${l.threat}</td>
 <td>${l.action}</td>
 </tr>`).join("");
 
-// BLOCKED
 ips.innerHTML=data.blocked_ips.map(ip=>`<li>${ip}</li>`).join("");
 users.innerHTML=data.blocked_users.map(u=>`<li>${u}</li>`).join("");
 }
 
 function simulateAttack(){
 for(let i=0;i<10;i++){
-fetch("/",{
-method:"POST",
-headers:{'Content-Type':'application/x-www-form-urlencoded'},
-body:"username=hacker&password=wrong"
-});
+fetch("/",{method:"POST",headers:{'Content-Type':'application/x-www-form-urlencoded'},body:"username=hacker&password=wrong"});
 }
 }
 
